@@ -8,26 +8,47 @@ use Data::Dumper;
 use JSON;
 use LWP::Simple;
 use Net::Twitter;
+use FindBin qw($Bin);
+use Proc::Daemon;
+use Log::Log4perl;
+use Config::Simple;
+
+my %config = ();
+Config::Simple->import_from("$Bin/../etc/robotmmafan.ini", \%config);
+Proc::Daemon::Init;
+
+Log::Log4perl::init_and_watch("$Bin/../etc/log4perl.conf",10);
+my $logger = Log::Log4perl->get_logger("MAIN");
 
 binmode STDOUT, ':utf8';
 
 my $nt = Net::Twitter->new(
   traits   => [qw/API::RESTv1_1/],
 
-  consumer_key        => 'TKRSM4XCISiSBUoxAHUDIA',
-  consumer_secret     => 'Gb8jVLOnDePTaXo2GxLHAO1vrYurGn2If9qUpaGaSeI',
-  access_token        => '1433851416-JWqqXsP68wRFpM6yP0h6puISlpDZq3ds9zpqfYU',
-  access_token_secret => 'eJMmDNRMzWsDmZcTcVCk4efAdndzqyIsugTEoTRh0',
+  consumer_key        => $config{'twitter.consumer_key'},
+  consumer_secret     => $config{'twitter.consumer_secret'},
+  access_token        => $config{'twitter.access_token'},
+  access_token_secret => $config{'twitter.access_token_secret'},
 );
 
 my $URL = 'http://api.twitter.com/1/lists/statuses.json?slug=fighters&owner_screen_name=ufc';
 my $latest_id = undef;
-my @bad_words = qw/
-  fag faggot fagget homo gay queer tranny rape
-  cunt lesbian lesbo nigger whore motherfucker
-  cocksucker twat retard fucktard paki
-/;
+my @bad_words = ();
 
+my $data_file = "$Bin/../data/culled_slurs.txt";
+die "Unable, $data_file doesn't exist" unless -e $data_file;
+
+open(INFILE, "<", $data_file)
+	or die "$!";
+
+while (<INFILE>) {
+	chomp;
+	push(@bad_words, $_);
+}
+
+$nt->update("\@earino father I have come online with ".$#bad_words." bad words.");
+
+my $tweet_count = 0;
 while (1) {
   my $current_url = $URL;
   if ($latest_id) {
@@ -42,18 +63,21 @@ while (1) {
   my $data = decode_json($content);
 
   foreach my $tweet (reverse @{$data}) {
+    $tweet_count++;
     $latest_id = $tweet->{id};
     foreach my $bad_word (@bad_words) {
-      if ($tweet->{text} =~ qr/\b$bad_word\b/i) {
+      if ($tweet->{text} =~ qr/\b\Q$bad_word\E\b/i) {
 	my $o_content = "\"@".$tweet->{user}->{screen_name}." ".$tweet->{text}."\"";
 	$content = substr($o_content, 0, 140);
 
-	print "Matched: $bad_word\n";
-	print "Retweeting: $content was $o_content ";
+	$logger->info("MATCHED: |$bad_word|");
+	$logger->info("Retweeting: $content was $o_content ");
         my $result = $nt->update($content);
 	print "Result: ".Dumper($result)."\n";
+	last;
       }
     }
   }
+  $logger->info("parsed $tweet_count tweets");
   sleep(60);
 }
