@@ -12,6 +12,7 @@ use FindBin qw($Bin);
 use Proc::Daemon;
 use Log::Log4perl;
 use Config::Simple;
+use File::Spec;
 
 my %config = ();
 Config::Simple->import_from("$Bin/../etc/robotmmafan.ini", \%config);
@@ -35,19 +36,11 @@ my $URL = 'http://api.twitter.com/1/lists/statuses.json?slug=fighters&owner_scre
 my $latest_id = undef;
 my @bad_words = ();
 
-my $data_file = "$Bin/../data/culled_slurs.txt";
-die "Unable, $data_file doesn't exist" unless -e $data_file;
-
-open(INFILE, "<", $data_file)
-	or die "$!";
-
-while (<INFILE>) {
-	chomp;
-	push(@bad_words, $_);
-}
+my %bad_words = build_multilingual_bad_words_map("$Bin/../data/");
 
 eval {
-	$nt->update("\@earino father I have come online with ".$#bad_words." bad words.");
+	#FIXME
+	#$nt->update("\@earino father I have come online with many bad words.");
 };
 
 if ($@) {
@@ -72,8 +65,11 @@ while (1) {
     $tweet_count++;
     $latest_id = $tweet->{id};
     $logger->debug(Dumper($tweet));
-    next unless $tweet->{lang} eq "en";
-    foreach my $bad_word (@bad_words) {
+
+    next unless defined($bad_words{$tweet->{lang}});
+
+    foreach my $bad_word (@{$bad_words{$tweet->{lang}}}) {
+
       if ($tweet->{text} =~ qr/\b\Q$bad_word\E\b/i) {
 	my $o_content = "\"@".$tweet->{user}->{screen_name}." ".$tweet->{text}."\"";
 	$content = substr($o_content, 0, 140);
@@ -88,4 +84,26 @@ while (1) {
   }
   $logger->info("parsed $tweet_count tweets");
   sleep(60);
+}
+
+sub build_multilingual_bad_words_map {
+	my ($directory) = @_;
+
+	my %bad_words = ( );
+	foreach my $file (glob("$directory/*")) {
+		open(INFILE, "<", $file)
+			or die "Unable to open file, reason: $!\n";
+
+		my ($volume,$directories,$file) = File::Spec->splitpath( $file );
+		my ($language, $junk) = split(/\./, $file, 2);
+		$bad_words{$language} = [];
+
+		while (<INFILE>) {
+			chomp;
+			push($bad_words{$language}, $_);
+		}
+		
+	}
+
+	return %bad_words;
 }
