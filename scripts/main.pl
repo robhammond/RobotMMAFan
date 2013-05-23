@@ -65,6 +65,7 @@ while (1) {
   foreach my $tweet (reverse @{$data}) {
     $tweet_count++;
     $latest_id = $tweet->{id};
+    next unless $tweet->{lang} eq "en";
     foreach my $bad_word (@bad_words) {
       if ($tweet->{text} =~ qr/\b\Q$bad_word\E\b/i) {
 	my $o_content = "\"@".$tweet->{user}->{screen_name}." ".$tweet->{text}."\"";
