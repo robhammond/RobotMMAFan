@@ -1,0 +1,6 @@
+Net::Twitter
+JSON
+Proc::Daemon
+Log::Log4perl
+Log::Dispatch::FileRotate
+Config::Simple
