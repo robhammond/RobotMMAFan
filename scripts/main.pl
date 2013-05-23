@@ -46,7 +46,13 @@ while (<INFILE>) {
 	push(@bad_words, $_);
 }
 
-$nt->update("\@earino father I have come online with ".$#bad_words." bad words.");
+eval {
+	$nt->update("\@earino father I have come online with ".$#bad_words." bad words.");
+};
+
+if ($@) {
+	$logger->info("restarted with same bad words.");
+}
 
 my $tweet_count = 0;
 while (1) {
@@ -65,6 +71,7 @@ while (1) {
   foreach my $tweet (reverse @{$data}) {
     $tweet_count++;
     $latest_id = $tweet->{id};
+    $logger->debug(Dumper($tweet));
     next unless $tweet->{lang} eq "en";
     foreach my $bad_word (@bad_words) {
       if ($tweet->{text} =~ qr/\b\Q$bad_word\E\b/i) {
