@@ -24,15 +24,15 @@ my $logger = Log::Log4perl->get_logger("MAIN");
 binmode STDOUT, ':utf8';
 
 my $nt = Net::Twitter->new(
-  traits   => [qw/API::RESTv1_1/],
-
-  consumer_key        => $config{'twitter.consumer_key'},
-  consumer_secret     => $config{'twitter.consumer_secret'},
-  access_token        => $config{'twitter.access_token'},
-  access_token_secret => $config{'twitter.access_token_secret'},
+    traits   => [qw/OAuth API::RESTv1_1/],
+	consumer_key        => $config{'twitter.consumer_key'},
+	consumer_secret     => $config{'twitter.consumer_secret'},
+	access_token        => $config{'twitter.access_token'},
+	access_token_secret => $config{'twitter.access_token_secret'},
+    ssl => 1,
 );
 
-my $URL = 'http://api.twitter.com/1/lists/statuses.json?slug=fighters&owner_screen_name=ufc';
+my $URL = $config{'twitter.url'};
 my $latest_id = undef;
 my @bad_words = ();
 
